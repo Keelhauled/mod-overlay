@@ -1,0 +1,45 @@
+#!/bin/python
+
+import os
+import argparse
+import time
+from subprocess import Popen, PIPE
+
+def mount():
+    print("Mounting mods")
+    mods = os.listdir(args.mods_dir)
+    mods.sort(reverse=True, key=lambda x: x.casefold())
+    for mod in mods: print(mod)
+    mods_string = ':'.join(f"{str(x)}/{args.mod_subdir}" for x in mods)
+    if not os.path.exists(args.mount_dir): os.mkdir(args.mount_dir)
+    process = Popen(["fuse-overlayfs", "-o", f"lowerdir={mods_string}", args.mount_dir], stdout=PIPE, stderr=PIPE)
+    process_wait(process)
+
+def unmount():
+    print("Unmounting")
+    process = Popen(["fusermount", "-uz", args.mount_dir], stdout=PIPE, stderr=PIPE)
+    process_wait(process)
+
+def process_wait(process : Popen[bytes]):
+    stdout, stderr = process.communicate()
+    if len(stdout) > 0: print(stdout.decode().strip())
+    if len(stderr) > 0: print(stderr.decode().strip())
+
+def daemonize():
+    try:
+        mount()
+        while True: time.sleep(100)
+    except KeyboardInterrupt:
+        print()
+    finally:
+        unmount()
+
+functions = {"mount" : mount, "unmount" : unmount, "daemon" : daemonize }
+parser = argparse.ArgumentParser(description="Mount/unmount overlayfs for mods")
+parser.add_argument("command", choices=functions)
+parser.add_argument("mods_dir", help="The directory that will be searched for mod folders.")
+parser.add_argument("mount_dir", help="The directory the overlay will be mounted to.")
+parser.add_argument("--mod-subdir", "-s", dest="mod_subdir", default="", help="The sub directory inside each mod folder that will be mounted.")
+args = parser.parse_args()
+os.chdir(args.mods_dir)
+functions[args.command]()
