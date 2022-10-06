@@ -34,7 +34,7 @@ def daemonize():
     finally:
         unmount()
 
-functions = {"mount" : mount, "unmount" : unmount, "daemon" : daemonize }
+functions = {"mount" : mount, "unmount" : unmount, "daemon" : daemonize}
 parser = argparse.ArgumentParser(description="Mount/unmount overlayfs for mods")
 parser.add_argument("command", choices=functions)
 parser.add_argument("mods_dir", help="The directory that will be searched for mod folders.")
