@@ -2,7 +2,6 @@
 
 import os
 import argparse
-import time
 from subprocess import Popen, PIPE
 
 def mount():
@@ -17,7 +16,7 @@ def mount():
 
 def unmount():
     print("Unmounting")
-    process = Popen(["fusermount", "-uz", args.mount_dir], stdout=PIPE, stderr=PIPE)
+    process = Popen(["fusermount", "-u", args.mount_dir], stdout=PIPE, stderr=PIPE)
     process_wait(process)
 
 def process_wait(process : Popen[bytes]):
@@ -28,11 +27,27 @@ def process_wait(process : Popen[bytes]):
 def daemonize():
     try:
         mount()
-        while True: time.sleep(100)
+        print()
+        command_input()
     except KeyboardInterrupt:
         print()
-    finally:
         unmount()
+
+def command_input():
+    command = input("Enter command: ")
+    if command == "reload":
+        unmount()
+        daemonize()
+    elif command == "quit":
+        unmount()
+    elif command == "help":
+        print_commands()
+        command_input()
+    else:
+        command_input()
+
+def print_commands():
+    print("reload, quit, help")
 
 functions = {"mount" : mount, "unmount" : unmount, "daemon" : daemonize}
 parser = argparse.ArgumentParser(description="Mount/unmount overlayfs for mods")
