@@ -3,6 +3,7 @@
 import os
 import argparse
 from subprocess import Popen, PIPE
+import colorama
 
 def mount():
     print("Mounting mods")
@@ -28,26 +29,29 @@ def daemonize():
     try:
         mount()
         print()
-        command_input()
+        cmd_input()
     except KeyboardInterrupt:
         print()
         unmount()
 
-def command_input():
-    command = input("Enter command: ")
-    if command == "reload":
+def cmd_input():
+    cmd = input("Enter command: ")
+    if cmd == "remount" or cmd == "r":
         unmount()
         daemonize()
-    elif command == "quit":
+    elif cmd == "unmount" or cmd == "u" or cmd == "q":
         unmount()
-    elif command == "help":
+    elif cmd == "help" or cmd == "h":
         print_commands()
-        command_input()
+        print()
+        cmd_input()
     else:
-        command_input()
+        cmd_input()
 
 def print_commands():
-    print("reload, quit, help")
+    r = colorama.Style.RESET_ALL
+    u = '\033[4m'
+    print(f"{u}r{r}emount, {u}u{r}nmount, {u}h{r}elp")
 
 functions = {"mount" : mount, "unmount" : unmount, "daemon" : daemonize}
 parser = argparse.ArgumentParser(description="Mount/unmount overlayfs for mods")
