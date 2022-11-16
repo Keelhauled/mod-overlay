@@ -12,7 +12,15 @@ def mount():
     for mod in mods: print(mod)
     mods_string = ':'.join(f"{str(x)}/{args.mod_subdir}" for x in mods)
     if not os.path.exists(args.mount_dir): os.mkdir(args.mount_dir)
-    process = Popen(["fuse-overlayfs", "-o", f"lowerdir={mods_string}", args.mount_dir], stdout=PIPE, stderr=PIPE)
+    command = ["fuse-overlayfs", "-o", f"lowerdir={mods_string}"]
+    if not args.upper_dir == "":
+        command.append("-o")
+        command.append(f"upperdir={args.upper_dir}")
+    if not args.work_dir == "":
+        command.append("-o")
+        command.append(f"workdir={args.work_dir}")
+    command.append(args.mount_dir)
+    process = Popen(command, stdout=PIPE, stderr=PIPE)
     process_wait(process)
 
 def unmount():
@@ -59,6 +67,8 @@ parser.add_argument("command", choices=functions)
 parser.add_argument("mods_dir", help="The directory that will be searched for mod folders.")
 parser.add_argument("mount_dir", help="The directory the overlay will be mounted to.")
 parser.add_argument("--mod-subdir", "-s", dest="mod_subdir", default="", help="The sub directory inside each mod folder that will be mounted.")
+parser.add_argument("--upperdir", "-u", dest="upper_dir", default="", help="")
+parser.add_argument("--workdir", "-w", dest="work_dir", default="", help="")
 parser.add_argument("--reverse", "-r", action="store_true", dest="reverse", default=False, help="Reverse mod priority")
 args = parser.parse_args()
 os.chdir(args.mods_dir)
