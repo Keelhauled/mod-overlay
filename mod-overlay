@@ -7,9 +7,10 @@ import colorama
 
 def mount():
     print("Mounting mods")
-    mods = list(filter(os.path.isdir, os.listdir(args.mods_dir)))
+    files = map(lambda x: os.path.join(args.mods_dir, x), os.listdir(args.mods_dir))
+    mods = list(filter(os.path.isdir, files))
     mods.sort(reverse=args.reverse, key=lambda x: x.casefold())
-    for mod in mods: print(mod)
+    for mod in mods: print(os.path.basename(mod))
     mods_string = ':'.join(f"{str(x)}/{args.mod_subdir}" for x in mods)
     if not os.path.exists(args.mount_dir): os.mkdir(args.mount_dir)
     command = ["fuse-overlayfs", "-o", f"lowerdir={mods_string}"]
@@ -71,5 +72,4 @@ parser.add_argument("--upperdir", "-u", dest="upper_dir", default="", help="")
 parser.add_argument("--workdir", "-w", dest="work_dir", default="", help="")
 parser.add_argument("--reverse", "-r", action="store_true", dest="reverse", default=False, help="Reverse mod priority")
 args = parser.parse_args()
-os.chdir(args.mods_dir)
 functions[args.command]()
