@@ -4,13 +4,34 @@ import os
 import argparse
 from subprocess import Popen, PIPE
 import colorama
+from gi.repository import GLib
+from dbus.mainloop.glib import DBusGMainLoop
+import dbus, dbus.service
+
+class DbusDaemon(dbus.service.Object):
+    def __init__(self, bus_name:str, bus_path:str):
+        super().__init__(bus_name, bus_path)
+    
+    METHOD_UID = "org.keelhauled.modoverlay.methods"
+
+    @dbus.service.method(dbus_interface=METHOD_UID)
+    def mount(self):
+        mount()
+
+    @dbus.service.method(dbus_interface=METHOD_UID)
+    def unmount(self):
+        unmount()
+
+    @dbus.service.method(dbus_interface=METHOD_UID)
+    def remount(self):
+        unmount()
+        mount()
 
 def mount():
-    print("Mounting mods")
     files = map(lambda x: os.path.join(args.mods_dir, x), os.listdir(args.mods_dir))
     mods = list(filter(os.path.isdir, files))
     mods.sort(reverse=args.reverse, key=lambda x: x.casefold())
-    for mod in mods: print(os.path.basename(mod))
+    print(f"Mounting {len(mods)} mods")
     mods_string = ':'.join(f"{str(x)}/{args.mod_subdir}" for x in mods)
     if not os.path.exists(args.mount_dir): os.mkdir(args.mount_dir)
     command = ["fuse-overlayfs", "-o", f"lowerdir={mods_string}"]
@@ -37,7 +58,6 @@ def process_wait(process : Popen[bytes]):
 def daemonize():
     try:
         mount()
-        print()
         cmd_input()
     except KeyboardInterrupt:
         print()
@@ -52,7 +72,6 @@ def cmd_input():
         unmount()
     elif cmd == "help" or cmd == "h":
         print_commands()
-        print()
         cmd_input()
     else:
         cmd_input()
@@ -62,7 +81,31 @@ def print_commands():
     u = '\033[4m'
     print(f"{u}r{r}emount, {u}u{r}nmount, {u}h{r}elp")
 
-functions = {"mount" : mount, "unmount" : unmount, "daemon" : daemonize}
+def dbus_run():
+    uid         =  f'org.keelhauled.modoverlay.{args.daemon_name}'
+    uid_as_path = f'/org/keelhauled/modoverlay/{args.daemon_name}'
+
+    DBusGMainLoop(set_as_default=True)
+    try:
+        bus_name = dbus.service.BusName(uid, bus=dbus.SessionBus(), do_not_queue=True)
+    except dbus.exceptions.NameExistsException:
+        print(f'Service with id {uid} is already running')
+        exit(1)
+    loop = GLib.MainLoop()
+    daemon = DbusDaemon(bus_name, uid_as_path)
+    try:
+        print("Waiting for dbus messages")
+        loop.run()
+    except KeyboardInterrupt:
+        print()
+        print('KeyboardInterrupt received')
+    except Exception as e:
+        print('Unhandled exception: `{}`'.format(str(e)))
+    finally:
+        loop.quit()
+
+
+functions = {"mount" : mount, "unmount" : unmount, "daemon" : daemonize, "dbus" : dbus_run}
 parser = argparse.ArgumentParser(description="Mount/unmount overlayfs for mods")
 parser.add_argument("command", choices=functions)
 parser.add_argument("mods_dir", help="The directory that will be searched for mod folders.")
@@ -71,5 +114,6 @@ parser.add_argument("--mod-subdir", "-s", dest="mod_subdir", default="", help="T
 parser.add_argument("--upperdir", "-u", dest="upper_dir", default="", help="")
 parser.add_argument("--workdir", "-w", dest="work_dir", default="", help="")
 parser.add_argument("--reverse", "-r", action="store_true", dest="reverse", default=False, help="Reverse mod priority")
+parser.add_argument("--daemon-name", dest="daemon_name", help="A unique name for the daemon. (Required for dbus mode)")
 args = parser.parse_args()
 functions[args.command]()
