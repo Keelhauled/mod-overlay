@@ -1,0 +1,81 @@
+#!/bin/python
+
+import os
+import argparse
+from subprocess import Popen, PIPE
+from dbus.mainloop.glib import DBusGMainLoop
+from gi.repository import GLib
+import dbus
+import dbus.service
+
+class MyappDaemon(dbus.service.Object):
+    def __init__(self, bus_name:str, bus_path:str, args):
+        self.args = args
+        super().__init__(bus_name, bus_path)
+    
+    METHOD_UID = "org.keelhauled.modoverlay.methods"
+
+    @dbus.service.method(dbus_interface=METHOD_UID)
+    def mount(self):
+        files = map(lambda x: os.path.join(self.args.mods_dir, x), os.listdir(self.args.mods_dir))
+        mods = list(filter(os.path.isdir, files))
+        mods.sort(reverse=self.args.reverse, key=lambda x: x.casefold())
+        print(f"Mounting {len(mods)} mods")
+        mods_string = ':'.join(f"{str(x)}/{self.args.mod_subdir}" for x in mods)
+        if not os.path.exists(self.args.mount_dir): os.mkdir(self.args.mount_dir)
+        command = ["fuse-overlayfs", "-o", f"lowerdir={mods_string}"]
+        if not self.args.upper_dir == "":
+            command.append("-o")
+            command.append(f"upperdir={self.args.upper_dir}")
+        if not self.args.work_dir == "":
+            command.append("-o")
+            command.append(f"workdir={self.args.work_dir}")
+        command.append(self.args.mount_dir)
+        process = Popen(command, stdout=PIPE, stderr=PIPE)
+        self.__process_wait(process)
+
+    @dbus.service.method(dbus_interface=METHOD_UID)
+    def unmount(self):
+        print("Unmounting")
+        process = Popen(["fusermount", "-u", self.args.mount_dir], stdout=PIPE, stderr=PIPE)
+        self.__process_wait(process)
+
+    def __process_wait(process : Popen[bytes]):
+        stdout, stderr = process.communicate()
+        if len(stdout) > 0: print(stdout.decode().strip())
+        if len(stderr) > 0: print(stderr.decode().strip())
+
+def main():
+    parser = argparse.ArgumentParser(description="Mount/unmount overlayfs for mods")
+    parser.add_argument("daemon_name", help="A unique name for the daemon.")
+    parser.add_argument("mods_dir", help="The directory that will be searched for mod folders.")
+    parser.add_argument("mount_dir", help="The directory the overlay will be mounted to.")
+    parser.add_argument("--mod-subdir", "-s", dest="mod_subdir", default="", help="The sub directory inside each mod folder that will be mounted.")
+    parser.add_argument("--upperdir", "-u", dest="upper_dir", default="", help="")
+    parser.add_argument("--workdir", "-w", dest="work_dir", default="", help="")
+    parser.add_argument("--reverse", "-r", action="store_true", dest="reverse", default=False, help="Reverse mod priority")
+    args = parser.parse_args()
+
+    uid         =  f'org.keelhauled.modoverlay.{args.daemon_name}'
+    uid_as_path = f'/org/keelhauled/modoverlay/{args.daemon_name}'
+
+    DBusGMainLoop(set_as_default=True)
+    try:
+        bus_name = dbus.service.BusName(uid, bus=dbus.SessionBus(), do_not_queue=True)
+    except dbus.exceptions.NameExistsException:
+        print(f'Service with id {uid} is already running')
+        exit(1)
+    loop = GLib.MainLoop()
+    daemon = MyappDaemon(bus_name, uid_as_path, args)
+    try:
+        loop.run()
+    except KeyboardInterrupt:
+        print()
+        print('KeyboardInterrupt received')
+    except Exception as e:
+        print('Unhandled exception: `{}`'.format(str(e)))
+    finally:
+        loop.quit()
+
+if __name__ == '__main__':
+    main()
