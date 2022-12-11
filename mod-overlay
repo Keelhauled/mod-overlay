@@ -3,67 +3,8 @@
 import os
 import argparse
 from subprocess import Popen, PIPE
-import time
-import signal
 
-class SignalHandler:
-  kill_now = False
-  def __init__(self):
-    signal.signal(signal.SIGINT, self.exit_gracefully)
-    signal.signal(signal.SIGTERM, self.exit_gracefully)
-
-  def exit_gracefully(self, *args):
-    self.kill_now = True
-
-def mount():
-    mods = []
-    if args.mod_subdir == "":
-        for root,dirs,files in os.walk(args.mods_dir):
-            mods = dirs
-            break
-    else:
-        for root,dirs,files in os.walk(args.mods_dir):
-            if args.mod_subdir in dirs:
-                mods.append(os.path.join(root, args.mod_subdir))
-                dirs = []
-    mods.sort(reverse=args.reverse, key=lambda x: x.casefold())
-    mods_string = ':'.join(mods)
-    print(f"Mounting {len(mods)} mods")
-    if not os.path.exists(args.mount_dir):
-        os.mkdir(args.mount_dir)
-    command = ["fuse-overlayfs", "-o", f"lowerdir={mods_string}"]
-    if not args.upper_dir == "":
-        command.append("-o")
-        command.append(f"upperdir={args.upper_dir}")
-    if not args.work_dir == "":
-        command.append("-o")
-        command.append(f"workdir={args.work_dir}")
-    command.append(args.mount_dir)
-    process = Popen(command, stdout=PIPE, stderr=PIPE)
-    process_wait(process)
-
-def unmount():
-    print("Unmounting")
-    process = Popen(["fusermount", "-u", args.mount_dir], stdout=PIPE, stderr=PIPE)
-    process_wait(process)
-
-def process_wait(process : Popen[bytes]):
-    stdout, stderr = process.communicate()
-    if len(stdout) > 0: print(stdout.decode().strip())
-    if len(stderr) > 0: print(stderr.decode().strip())
-
-def daemonize():
-    try:
-        signal = SignalHandler()
-        mount()
-        while not signal.kill_now:
-            time.sleep(1)
-    finally:
-        unmount()
-
-functions = {"mount" : mount, "unmount" : unmount, "daemon" : daemonize}
 parser = argparse.ArgumentParser(description="Mount/unmount overlayfs for mods")
-parser.add_argument("command", choices=functions)
 parser.add_argument("mods_dir", help="The directory that will be searched for mod folders.")
 parser.add_argument("mount_dir", help="The directory the overlay will be mounted to.")
 parser.add_argument("--mod-subdir", "-s", dest="mod_subdir", default="", help="The sub directory inside each mod folder that will be mounted.")
@@ -71,4 +12,35 @@ parser.add_argument("--upperdir", "-u", dest="upper_dir", default="", help="")
 parser.add_argument("--workdir", "-w", dest="work_dir", default="", help="")
 parser.add_argument("--reverse", "-r", action="store_true", dest="reverse", default=False, help="Reverse mod priority")
 args = parser.parse_args()
-functions[args.command]()
+
+mods = []
+if args.mod_subdir == "":
+    for root,dirs,files in os.walk(args.mods_dir):
+        mods = dirs
+        break
+else:
+    for root,dirs,files in os.walk(args.mods_dir):
+        if args.mod_subdir in dirs:
+            mods.append(os.path.join(root, args.mod_subdir))
+            dirs = []
+            
+mods.sort(reverse=args.reverse, key=lambda x: x.casefold())
+mods_string = ':'.join(mods)
+print(f"Mounting {len(mods)} mods")
+
+if not os.path.exists(args.mount_dir):
+    os.mkdir(args.mount_dir)
+
+command = ["fuse-overlayfs", "-o", f"lowerdir={mods_string}"]
+if not args.upper_dir == "":
+    command.append("-o")
+    command.append(f"upperdir={args.upper_dir}")
+if not args.work_dir == "":
+    command.append("-o")
+    command.append(f"workdir={args.work_dir}")
+command.append(args.mount_dir)
+
+process = Popen(command, stdout=PIPE, stderr=PIPE)
+stdout, stderr = process.communicate()
+if len(stdout) > 0: print(stdout.decode().strip())
+if len(stderr) > 0: print(stderr.decode().strip())
