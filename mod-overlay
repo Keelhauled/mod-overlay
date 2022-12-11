@@ -16,12 +16,21 @@ class SignalHandler:
     self.kill_now = True
 
 def mount():
-    files = map(lambda x: os.path.join(args.mods_dir, x), os.listdir(args.mods_dir))
-    mods = list(filter(os.path.isdir, files))
+    mods = []
+    if args.mod_subdir == "":
+        for root,dirs,files in os.walk(args.mods_dir):
+            mods = dirs
+            break
+    else:
+        for root,dirs,files in os.walk(args.mods_dir):
+            if args.mod_subdir in dirs:
+                mods.append(os.path.join(root, args.mod_subdir))
+                dirs = []
     mods.sort(reverse=args.reverse, key=lambda x: x.casefold())
+    mods_string = ':'.join(mods)
     print(f"Mounting {len(mods)} mods")
-    mods_string = ':'.join(f"{str(x)}/{args.mod_subdir}" for x in mods)
-    if not os.path.exists(args.mount_dir): os.mkdir(args.mount_dir)
+    if not os.path.exists(args.mount_dir):
+        os.mkdir(args.mount_dir)
     command = ["fuse-overlayfs", "-o", f"lowerdir={mods_string}"]
     if not args.upper_dir == "":
         command.append("-o")
@@ -48,7 +57,7 @@ def daemonize():
         signal = SignalHandler()
         mount()
         while not signal.kill_now:
-            time.sleep(10)
+            time.sleep(1)
     finally:
         unmount()
 
