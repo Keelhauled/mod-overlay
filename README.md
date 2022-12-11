@@ -11,4 +11,4 @@ A simple linux mod manager using fuse-[overlayfs](https://docs.kernel.org/filesy
     ├── mod2
     │   ├── modfiles
     ```
-- Run `mod-overlay daemon/mount/unmount PATH_TO_MODS_FOLDER PATH_TO_WHERE_GAME_EXPECTS_MODS_TO_BE`
+- Run `mod-overlay PATH_TO_MODS_FOLDER PATH_TO_WHERE_GAME_EXPECTS_MODS_TO_BE`
