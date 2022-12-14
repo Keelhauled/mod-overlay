@@ -1,10 +1,10 @@
 #!/bin/python
 
 import os
-import argparse
+from argparse import ArgumentParser
 from subprocess import Popen, PIPE
 
-parser = argparse.ArgumentParser(description="Mount/unmount overlayfs for mods")
+parser = ArgumentParser(description="Mount overlayfs for mods")
 parser.add_argument("mods_dir", help="The directory that will be searched for mod folders.")
 parser.add_argument("mount_dir", help="The directory the overlay will be mounted to.")
 parser.add_argument("--mod-subdir", "-s", dest="mod_subdir", default="", help="The sub directory inside each mod folder that will be mounted.")
