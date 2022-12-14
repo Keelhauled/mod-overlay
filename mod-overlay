@@ -40,6 +40,7 @@ ExecStop=fusermount -u {args.mount_dir}
 [Install]
 WantedBy=default.target
 """)
+
     if os.path.exists(filepath):
         print(f"Service created in {filepath}")
         print("Double check the file for any errors for your own sake")
@@ -70,11 +71,9 @@ def mount(args):
 
     command = ["fuse-overlayfs", "-o", f"lowerdir={mods_string}"]
     if args.upper_dir != None:
-        command.append("-o")
-        command.append(f"upperdir={args.upper_dir}")
+        command.extend(["-o", f"upperdir={args.upper_dir}"])
     if args.work_dir != None:
-        command.append("-o")
-        command.append(f"workdir={args.work_dir}")
+        command.extend(["-o", f"workdir={args.work_dir}"])
     command.append(args.mount_dir)
 
     process = Popen(command, stdout=PIPE, stderr=PIPE)
