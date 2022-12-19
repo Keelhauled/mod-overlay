@@ -62,7 +62,7 @@ def mount(args):
         for root,dirs,files in os.walk(args.mods_dir):
             if args.mod_subdir in dirs:
                 mods.append(root)
-                dirs = []
+                dirs.clear()
         mods.sort(reverse=args.reverse, key=lambda x: x.casefold())
         for i in range(len(mods)):
             mods[i] = os.path.join(mods[i], args.mod_subdir)
