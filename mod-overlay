@@ -13,6 +13,7 @@ def parse_args():
     parser.add_argument("--workdir", dest="work_dir", help="A directory used internally by fuse-overlays, must be on the same file system as the upper dir.")
     parser.add_argument("--reverse", dest="reverse", help="Reverse the mod priority.", action="store_true")
     parser.add_argument("--setup", dest="service_name", help="Instead of mounting the overlay, create a systemd service to do it automatically. Service will be named like 'mod-overlay-SERVICE_NAME.service'")
+    parser.add_argument("--verbose", "-v", dest="verbose", help="Print the mod order when mounting", action="store_true")
     return parser.parse_args()
 
 def create_service(args):
@@ -56,19 +57,26 @@ def mount(args):
         for root,dirs,files in os.walk(args.mods_dir):
             mods = dirs
             break
+        mods.sort(reverse=args.reverse, key=lambda x: x.casefold())
     else:
         for root,dirs,files in os.walk(args.mods_dir):
             if args.mod_subdir in dirs:
-                mods.append(os.path.join(root, args.mod_subdir))
+                mods.append(root)
                 dirs = []
+        mods.sort(reverse=args.reverse, key=lambda x: x.casefold())
+        for i in range(len(mods)):
+            mods[i] = os.path.join(mods[i], args.mod_subdir)
 
-    mods.sort(reverse=args.reverse, key=lambda x: x.casefold())
-    mods_string = ':'.join(mods)
     print(f"Mounting {len(mods)} mods")
+    if args.verbose:
+        print("Mods starting from highest priority:")
+        for mod in mods:
+            print(mod)
 
     if not os.path.exists(args.mount_dir):
         os.mkdir(args.mount_dir)
 
+    mods_string = ':'.join(mods)
     command = ["fuse-overlayfs", "-o", f"lowerdir={mods_string}"]
     if args.upper_dir != None:
         command.extend(["-o", f"upperdir={args.upper_dir}"])
