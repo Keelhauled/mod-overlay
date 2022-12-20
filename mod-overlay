@@ -29,6 +29,8 @@ def create_service(args):
         exec += f" --workdir {args.work_dir}"
     if args.reverse:
         exec += " --reverse"
+    if args.verbose:
+        exec += " --verbose"
 
     with open(filepath, 'x') as f:
         f.write(f"""[Unit]
