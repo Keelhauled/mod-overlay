@@ -68,6 +68,10 @@ def mount(args):
         mods.sort(reverse=args.reverse, key=lambda x: x.casefold())
         mods = list(map(lambda x: os.path.join(x, args.mod_subdir), mods))
 
+    if len(mods) == 0:
+        print("No mods to mount")
+        quit()
+
     print(f"Mounting {len(mods)} mods")
     if args.verbose:
         print("Mods starting from highest priority:")
