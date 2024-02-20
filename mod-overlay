@@ -3,12 +3,13 @@
 import os
 from argparse import ArgumentParser
 from subprocess import Popen, PIPE
+from pathlib import Path
 
 def parse_args():
     parser = ArgumentParser(description="Mount overlayfs for mods")
     parser.add_argument("mods_dir", help="The directory that will be searched for mod folders.")
     parser.add_argument("mount_dir", help="The directory the overlay will be mounted to.")
-    parser.add_argument("--subdir", dest="mod_subdir", help="The sub directory inside each mod folder that will be mounted.")
+    parser.add_argument("--subdir", dest="mod_subdir", help="The subdirectory inside each mod folder that will be mounted.")
     parser.add_argument("--upperdir", dest="upper_dir", help="A directory merged on top of all the mod dirs where all the changes done to the file system will be written.")
     parser.add_argument("--workdir", dest="work_dir", help="A directory used internally by fuse-overlays, must be on the same file system as the upper dir.")
     parser.add_argument("--reverse", dest="reverse", help="Reverse the mod priority.", action="store_true")
@@ -51,26 +52,21 @@ WantedBy=default.target
         print(f"Run 'systemctl --user start {filename}' to start the overlay")
         print(f"Run 'systemctl --user enable {filename}' if you want to start the service on boot")
     else:
-        print("Something went wrong ¯\_(ツ)_/¯")
+        print("Systemd service file was not created ¯\_(ツ)_/¯")
 
 def mount(args):
     mods = []
+    modspath = Path(args.mods_dir)
     if args.mod_subdir == None:
-        for root,dirs,files in os.walk(args.mods_dir):
-            mods = list(map(lambda x: os.path.join(root, x), dirs))
-            break
-        mods.sort(reverse=args.reverse, key=lambda x: x.casefold())
+        mods = list(modspath.iterdir())
     else:
-        for root,dirs,files in os.walk(args.mods_dir):
-            if args.mod_subdir in dirs:
-                mods.append(root)
-                dirs.clear()
-        mods.sort(reverse=args.reverse, key=lambda x: x.casefold())
-        mods = list(map(lambda x: os.path.join(x, args.mod_subdir), mods))
+        mods = list(modspath.glob(f"*/**/{args.mod_subdir}"))
 
     if len(mods) == 0:
         print("No mods to mount")
         quit()
+
+    mods.sort(reverse=args.reverse, key=lambda x: str(x).casefold())
 
     print(f"Mounting {len(mods)} mods")
     if args.verbose:
@@ -81,7 +77,7 @@ def mount(args):
     if not os.path.exists(args.mount_dir):
         os.mkdir(args.mount_dir)
 
-    mods_string = ':'.join(mods)
+    mods_string = ':'.join(map(lambda x: str(x), mods))
     command = ["fuse-overlayfs", "-o", f"lowerdir={mods_string}"]
     if args.upper_dir != None:
         command.extend(["-o", f"upperdir={args.upper_dir}"])
