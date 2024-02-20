@@ -39,7 +39,7 @@ Description=mod-overlay {args.service_name}
 Type=forking
 WorkingDirectory={os.getcwd()}
 ExecStart={exec}
-ExecStop=fusermount -u {args.mount_dir}
+ExecStopPost=fusermount -u {args.mount_dir}
 [Install]
 WantedBy=default.target
 """)
