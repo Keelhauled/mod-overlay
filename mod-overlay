@@ -2,7 +2,7 @@
 
 import os
 from argparse import ArgumentParser
-from subprocess import Popen, PIPE
+import subprocess
 from pathlib import Path
 
 def parse_args():
@@ -15,6 +15,7 @@ def parse_args():
     parser.add_argument("--reverse", dest="reverse", help="Reverse the mod priority.", action="store_true")
     parser.add_argument("--setup", dest="service_name", help="Instead of mounting the overlay, create a systemd service to do it automatically. Service will be named like 'mod-overlay-SERVICE_NAME.service'")
     parser.add_argument("--verbose", "-v", dest="verbose", help="Print the mod order when mounting", action="store_true")
+    parser.add_argument("--list", dest="list", help="Print a list of the mod order and nothing else", action="store_true")
     return parser.parse_args()
 
 def create_service(args):
@@ -48,15 +49,19 @@ WantedBy=default.target
     if os.path.exists(filepath):
         print(f"Service created in {filepath}")
         print("Double check the file for any errors for your own sake")
-        print("Run 'systemctl --user daemon-reload' to get systemd to notice the new file")
+        print("Run 'systemctl --user daemon-reload' for systemd to notice the new file")
         print(f"Run 'systemctl --user start {filename}' to start the overlay")
-        print(f"Run 'systemctl --user enable {filename}' if you want to start the service on boot")
+        print(f"Run 'systemctl --user enable {filename}' to automatically start the service on login")
     else:
         print("Systemd service file was not created ¯\_(ツ)_/¯")
 
 def mount(args):
     mods = []
     modspath = Path(args.mods_dir)
+    if not modspath.exists():
+        print(f"Directory '{modspath}' does not exist")
+        quit()
+
     if args.mod_subdir == None:
         mods = list(modspath.iterdir())
     else:
@@ -68,14 +73,12 @@ def mount(args):
 
     mods.sort(reverse=args.reverse, key=lambda x: str(x).casefold())
 
-    print(f"Mounting {len(mods)} mods")
-    if args.verbose:
+    if not args.list:
+        print(f"Mounting {len(mods)} mods")
+    if args.verbose or args.list:
         print("Mods starting from highest priority:")
-        for mod in mods:
-            print(mod)
-
-    if not os.path.exists(args.mount_dir):
-        os.mkdir(args.mount_dir)
+        print(*mods, sep="\n")
+        if args.list: quit()
 
     mods_string = ':'.join(map(lambda x: str(x), mods))
     command = ["fuse-overlayfs", "-o", f"lowerdir={mods_string}"]
@@ -83,12 +86,9 @@ def mount(args):
         command.extend(["-o", f"upperdir={args.upper_dir}"])
     if args.work_dir != None:
         command.extend(["-o", f"workdir={args.work_dir}"])
+    os.makedirs(args.mount_dir, exist_ok=True)
     command.append(args.mount_dir)
-
-    process = Popen(command, stdout=PIPE, stderr=PIPE)
-    stdout, stderr = process.communicate()
-    if len(stdout) > 0: print(stdout.decode().strip())
-    if len(stderr) > 0: print(stderr.decode().strip())
+    subprocess.run(command)
 
 if __name__ == "__main__":
     args = parse_args()
